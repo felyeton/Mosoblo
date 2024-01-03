@@ -1,23 +1,30 @@
-import requests
-
 from datetime import datetime as dt, timedelta
+
+import json
+import requests
 
 
 class ParseMO:
     start_time = None
     end_time = None
+    data = {}
+    result = []
+
+    # response = ''
 
     def __init__(self, date: str):
         self.calc_time(date)
+        self.get_data()
 
     def calc_time(self, date: str):
         self.start_time = int(dt.timestamp(dt.fromisoformat(date)) * 1000)
         self.end_time = int(dt.timestamp(dt.fromisoformat(date) + timedelta(days=1)) * 1000 - 1)
-        print(int(self.start_time), int(self.end_time))
+        # print(int(self.start_time), int(self.end_time))
 
-    def parse(self):
+    def get_data(self):
         response = requests.get(
-            f'https://nopowersupply.mosoblenergo.ru/back/api/otklyuchenies?populate[uzel_podklyucheniya][populate][uliczas]=true'
+            f'https://nopowersupply.mosoblenergo.ru/back/api/otklyuchenies'
+            f'?populate[uzel_podklyucheniya][populate][uliczas]=true'
             f'&populate[uzel_podklyucheniya][populate][gorod]=true'
             f'&filters[$or][0][$and][0][begin][$gte]={self.start_time}'
             f'&filters[$or][0][$and][1][begin][$lte]={self.end_time}'
@@ -26,11 +33,36 @@ class ParseMO:
             f'&pagination[pageSize]=100000',
             # headers=headers,
         )
-        print(response.json())
-        print(self.start_time, self.end_time)
 
-    def __read_json(self):
-        pass
+        with open('data.json', 'w') as file:
+            json.dump(response.json(), file, ensure_ascii=False, indent=2)
+
+        with open('data.json') as file:
+            self.data = json.load(file)
+
+        # print(type(self.data))
+
+        # print(response.json())
+
+        # print(self.start_time, self.end_time)
+
+    def outlay(self):
+        result = []
+        for item in self.data['data']:
+            addresses = []
+            for i in item['attributes']['uzel_podklyucheniya']['data']['attributes']['uliczas']['data']:
+                addresses.append(i['attributes']['name'] + ' ' + i['attributes']['comment'])
+            result.append({'id': item['id'],
+                           'comment': item['attributes']['comment'],
+                           'start_time': item['attributes']['begin'],
+                           'end_time': item['attributes']['begin'],
+                           'eu': item['attributes']['uzel_podklyucheniya']['data']['attributes']['name'],
+                           'addresses': addresses,
+                           })
+        with open('result.json', 'w') as file:
+            json.dump(result, file, ensure_ascii=False, indent=2)
+
+        return result
 
 
 # headers = {
@@ -50,7 +82,8 @@ class ParseMO:
 
 
 def main():
-    a = ParseMO("2023-12-05").parse()
+    a = ParseMO("2023-01-18").outlay()
+    print(a)
 
 
 if __name__ == "__main__":
